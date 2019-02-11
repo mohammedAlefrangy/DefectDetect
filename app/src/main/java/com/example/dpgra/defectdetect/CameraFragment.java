@@ -57,6 +57,8 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
     private PotholeList potholeList;
     private Integer OrientationIsValid;
     private double confidenceThresh;
+    BaseLoaderCallback mLoaderCallback ;
+    Mat imageMat;
 
 
     @SuppressLint("ValidFragment")
@@ -73,32 +75,12 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
      * @return the camera fragment
      */
     public static CameraFragment getInstance() {
-        if ( cameraFragment == null ) {
+        if (cameraFragment == null) {
             cameraFragment = new CameraFragment();
         }
         return cameraFragment;
     }
 
-    /**
-     * Makes sure opencv can load successfully.
-     */
-    private final BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this.getActivity()) {
-        @SuppressLint("LongLogTag")
-        @Override
-        public void onManagerConnected(int status) {
-            switch (status) {
-                case LoaderCallbackInterface.SUCCESS: {
-                    //Log.i(TAG, "OpenCV loaded successfully");
-                    mOpenCvCameraView.enableView();
-                    break;
-                }
-                default: {
-                    super.onManagerConnected(status);
-                    break;
-                }
-            }
-        }
-    };
 
     @Override
     public void onStart() {
@@ -109,7 +91,7 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if ( getActivity() != null ) {
+        if (getActivity() != null) {
             getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
     }
@@ -123,7 +105,7 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
         //Check if the device is not an emulator
         String myDeviceModel = android.os.Build.MODEL;
 
-        if(!myDeviceModel.toLowerCase().contains("sdk")) {
+        if (!myDeviceModel.toLowerCase().contains("sdk")) {
             //Rotate the camera view 90 degrees clockwise
             mOpenCvCameraView.setAngle(90);
         }
@@ -131,6 +113,31 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
         mOpenCvCameraView.setCvCameraViewListener(this);
         SeekBar seekBar = rootView.findViewById(R.id.seekBar);
         seekBar.setOnSeekBarChangeListener(this);
+
+
+        /**
+         * Makes sure opencv can load successfully.
+         */
+        mLoaderCallback = new BaseLoaderCallback(this.getActivity()) {
+            @SuppressLint("LongLogTag")
+            @Override
+            public void onManagerConnected(int status) {
+                switch (status) {
+                    case LoaderCallbackInterface.SUCCESS: {
+                        //Log.i(TAG, "OpenCV loaded successfully");
+                        mOpenCvCameraView.enableView();
+//                        imageMat = new Mat();
+                        break;
+                    }
+                    default: {
+                        super.onManagerConnected(status);
+                        break;
+                    }
+                }
+            }
+        };
+
+
         return rootView;
     }
 
@@ -166,8 +173,8 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
         String cfgFile = getPath(".cfg", this.getActivity());
         String weightsFile = getPath(".weights", this.getActivity());
 
-        if ( cfgFile != null && weightsFile != null ) {
-            net = new Darknet( cfgFile, weightsFile );
+        if (cfgFile != null && weightsFile != null) {
+            net = new Darknet(cfgFile, weightsFile);
         }
         //mOpenCvCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
     }
@@ -199,7 +206,7 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
         old_mRgbaT.release();
         */
         Mat temp = null;
-        for (int i = 0; i < OrientationIsValid; i++ ) {
+        for (int i = 0; i < OrientationIsValid; i++) {
 
             temp = frame.t();
             Core.flip(temp, temp, 1);
@@ -210,41 +217,41 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
         int cols = mRgbaT.cols();
         int rows = mRgbaT.rows();
         Size cropSize;
-        if ((float)cols / rows > 1) {
+        if ((float) cols / rows > 1) {
             cropSize = new Size(rows * 1, rows);
         } else {
             cropSize = new Size(cols, cols / 1);
         }
-        int y1 = (int)(rows - cropSize.height) / 2;
-        int y2 = (int)(y1 + cropSize.height);
-        int x1 = (int)(cols - cropSize.width) / 2;
-        int x2 = (int)(x1 + cropSize.width);
+        int y1 = (int) (rows - cropSize.height) / 2;
+        int y2 = (int) (y1 + cropSize.height);
+        int x1 = (int) (cols - cropSize.width) / 2;
+        int x2 = (int) (x1 + cropSize.width);
         Mat subFrame = mRgbaT.submat(y1, y2, x1, x2);
         cols = subFrame.cols();
         rows = subFrame.rows();
         int sevarity = 0;
-        if ( net != null ) {
+        if (net != null) {
             double confidence, xCenter, yCenter, width, height = 0;
             Mat retMat = net.forwardLoadedNetwork(mRgbaT);
-            for ( int i = 0; i < retMat.rows(); i++ ) {
+            for (int i = 0; i < retMat.rows(); i++) {
                 confidence = retMat.get(i, 5)[0];
-                if ( confidence > confidenceThresh ) {
+                if (confidence > confidenceThresh) {
                     printMat(retMat.row(i));
                     //System.out.println("YESSSSSS");
-                    xCenter = retMat.get(i, 0)[0]*mRgbaT.cols();
-                    yCenter = retMat.get(i, 1)[0]*mRgbaT.rows();
-                    width = retMat.get(i, 2)[0]*mRgbaT.cols();
-                    height = retMat.get(i, 3)[0]*mRgbaT.rows();
-                    Imgproc.rectangle(mRgbaT, new Point((xCenter - width / 2), (yCenter - height / 2 )), new Point(xCenter + width / 2
+                    xCenter = retMat.get(i, 0)[0] * mRgbaT.cols();
+                    yCenter = retMat.get(i, 1)[0] * mRgbaT.rows();
+                    width = retMat.get(i, 2)[0] * mRgbaT.cols();
+                    height = retMat.get(i, 3)[0] * mRgbaT.rows();
+                    Imgproc.rectangle(mRgbaT, new Point((xCenter - width / 2), (yCenter - height / 2)), new Point(xCenter + width / 2
                             , yCenter + height / 2), new Scalar(255, 0, 0), 4);
-                    Imgproc.putText(mRgbaT, String.format("%.4f", new Double(confidence * 100)) + "%",new Point((xCenter - width / 2), (yCenter - height / 2 ) - 5)
-                            , 1, 1, new Scalar(255,0,0), 2);
+                    Imgproc.putText(mRgbaT, String.format("%.4f", new Double(confidence * 100)) + "%", new Point((xCenter - width / 2), (yCenter - height / 2) - 5)
+                            , 1, 1, new Scalar(255, 0, 0), 2);
                     sevarity++;
                 }
             }
             retMat.release();
             subFrame.release();
-            if ( sevarity > 0 ) {
+            if (sevarity > 0) {
                 createPothole(sevarity);
             }
         } else {
@@ -253,12 +260,12 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
         return mRgbaT;
     }
 
-    private Pothole createPothole( int severity ) {
+    private Pothole createPothole(int severity) {
         Pothole pothole = null;
-        if ( this.getActivity() != null ) {
+        if (this.getActivity() != null) {
             Location location = ((MainActivity) this.getActivity()).getLocation();
-            if ( location != null ) {
-                pothole = new Pothole( location, createPotholeId(), severity);
+            if (location != null) {
+                pothole = new Pothole(location, createPotholeId(), severity);
                 addToPotholeList(pothole);
             }
         }
@@ -274,7 +281,7 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
     public String createPotholeId() {
         PotholeList list = PotholeList.getInstance();
         int num = 0;
-        if ( !list.isEmpty() ) {
+        if (!list.isEmpty()) {
             String lastId = list.get(list.size() - 1).getId();
             num = Integer.parseInt(lastId.substring(1));
         }
@@ -284,12 +291,13 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
 
     /**
      * Prints the returned matrix outputted from the network.
+     *
      * @param mat the mat to print
      */
-    private void printMat( Mat mat ) {
-        for ( int i = 0; i < mat.rows(); i++) {
+    private void printMat(Mat mat) {
+        for (int i = 0; i < mat.rows(); i++) {
             //System.out.print("[ ");
-            for ( int n = 0; n < mat.cols(); n++ ) {
+            for (int n = 0; n < mat.cols(); n++) {
                 try {
                     //System.out.printf( "%.2f ", mat.get(i, n)[0]);
                 } catch (NullPointerException e) {
@@ -310,9 +318,9 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
                 OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this.getActivity(), mLoaderCallback);
             } else {
                 Log.d("Debug", "OpenCV library found inside package. Using it!");
-                mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+                mLoaderCallback.onManagerConnected(BaseLoaderCallback.SUCCESS);
             }
-        } catch(NullPointerException e) {
+        } catch (NullPointerException e) {
             Toast.makeText(this.getActivity(), "OpenCV is required to run this feature. Please install OpenCV from the Google Play Store or download the APK from their official website.", Toast.LENGTH_LONG).show();
         }
     }
@@ -321,22 +329,23 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
      * Gets the path of a file and create it in the app memory.
      *
      * @param fileType the file to find
-     * @param context context
+     * @param context  context
      * @return the pathname
      */
     @SuppressLint("LongLogTag")
     private static String getPath(String fileType, Context context) {
         AssetManager assetManager = context.getAssets();
         String[] pathNames = {};
-        String fileName = "";System.out.println("-----------------------------------------------------------------------");
+        String fileName = "";
+        System.out.println("-----------------------------------------------------------------------");
         try {
             pathNames = assetManager.list("yolo");
         } catch (IOException e) {
             e.printStackTrace();
         }
-        for ( String filePath : pathNames ) {
+        for (String filePath : pathNames) {
             System.out.println(filePath);
-            if ( filePath.endsWith(fileType)) {
+            if (filePath.endsWith(fileType)) {
                 fileName = filePath;
                 break;
             }
@@ -374,7 +383,7 @@ public class CameraFragment extends Fragment implements CameraBridgeViewBase.CvC
     @Override
     public void onClick(View view) {
         OrientationIsValid++;
-        if ( OrientationIsValid > 3 ) {
+        if (OrientationIsValid > 3) {
             OrientationIsValid = 0;
         }
     }
